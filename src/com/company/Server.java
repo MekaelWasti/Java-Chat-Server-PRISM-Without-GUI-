@@ -10,25 +10,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class Server {
 
     private BufferedWriter bw;
-    public String message = "";
     public String finalMessage = "";
     public String address = "";
     public String sendingUser = "";
     public Socket s;
 
+    //Store all client usernames as keys and corresponding sockets as values
     public HashMap<String,Socket> listOfUsers = new HashMap<String,Socket>();
 
     public void start() throws IOException {
-        //Set Up Server GUI Elements
-
         //Socket
         ServerSocket ss = new ServerSocket(63030);
-        Thread thread = new Thread(() -> {
-            //System.out.println("New Thread \"thread\"");
-            //AtomicInteger count = new AtomicInteger();
+
+//        Thread thread = new Thread(() -> {
             while (true) {
-
-
                 try {
                     s = ss.accept();
                     BufferedReader br = new BufferedReader((new InputStreamReader(s.getInputStream())));
@@ -46,8 +41,6 @@ public class Server {
                 System.out.println("Client Connected: " + sendingUser + " - Address: " + s.getRemoteSocketAddress());
 
                 Thread thread1 = new Thread(() -> {
-                    //count.getAndIncrement();
-                    //System.out.println("New Thread \"thread1\"" + count);
                     while (finalS.isConnected()) {
 
                         BufferedReader br = null;
@@ -69,7 +62,7 @@ public class Server {
                                 i++;
                             }
 
-                            System.out.println("Sending: " + finalMessage + " - From: " + sendingUser + " - To: " + address);
+                            System.out.println("Sending: " + finalMessage + " - From: " + sendingUser + " - To: " + address); //For development purposes
                             writeMessage(finalS, address, sendingUser);
                             address = "";
                             finalMessage = "";
@@ -77,7 +70,6 @@ public class Server {
 
                         } catch (IOException e) {
                             removeClient(sendingUser);
-//                            removeClient(finalS);
                             try {
                                 finalS.close();
                             } catch (IOException ex) {
@@ -88,24 +80,31 @@ public class Server {
                 });
                 thread1.start();
             }
-        });
-        thread.start();
+//        });
+//        thread.start();
     }
 
     public void writeMessage(Socket s, String address, String sendingUser) throws IOException {
-        System.out.println("Sending to Address: " + address);
-        System.out.println("Client Address: " + s.getRemoteSocketAddress());
+        System.out.println("Sending to Address: " + address); //For development purposes
+        System.out.println("Client Address: " + s.getRemoteSocketAddress()); //For development purposes
 
-        //Slicing out port from user code and sending to desired client
+        for (String key : listOfUsers.keySet()) {
+            System.out.println(key);
+
+        }
+
+        //Error if desired user to send to is not found
         if (!listOfUsers.containsKey(address)) {
-            System.out.println("Could not find user");
+            System.out.println("Could not find user"); //For development purposes
             return;
         }
 
         try {
-
+            //Write and send message to each desired user (write out sending username)
             BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(listOfUsers.get(address).getOutputStream()));
             StringBuilder rawUsernameBuilder = new StringBuilder(sendingUser);
+
+            //Slicing out port from user code and sending to desired client
             String rawUsername = rawUsernameBuilder.substring(0, sendingUser.length() - 6);
             bw.write(rawUsername + ": " + finalMessage);
             bw.newLine();
@@ -116,8 +115,11 @@ public class Server {
     }
 
 
+    //Is called when a socket connection is closed and the client is
+    //removed from the hash map
     public void removeClient(String sendingUser) {
         listOfUsers.remove(sendingUser);
+
     }
 
 }
