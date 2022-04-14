@@ -3,92 +3,86 @@ package com.company;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Server {
 
     private BufferedWriter bw;
-    //    public String message = null;
     public String message = "";
     public String finalMessage = "";
     public String address = "";
+    public String sendingUser = "";
     public Socket s;
-    public ArrayList<Socket> listOfClients = new ArrayList<Socket>();
-    public String recipientClient = "";
+
+    public HashMap<String,Socket> listOfUsers = new HashMap<String,Socket>();
 
     public void start() throws IOException {
-        //Socket
+        //Set Up Server GUI Elements
 
         //Socket
-
         ServerSocket ss = new ServerSocket(63030);
-
         Thread thread = new Thread(() -> {
-//        System.out.println("New Thread \"thread\"");
-            AtomicInteger count = new AtomicInteger();
+            //System.out.println("New Thread \"thread\"");
+            //AtomicInteger count = new AtomicInteger();
             while (true) {
+
+
                 try {
                     s = ss.accept();
-                    listOfClients.add(s);
+                    BufferedReader br = new BufferedReader((new InputStreamReader(s.getInputStream())));
+
+                    //Get Username
+                    sendingUser = br.readLine();
+                    listOfUsers.put(sendingUser, s);
+
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
-                InetSocketAddress sockaddress = (InetSocketAddress)s.getRemoteSocketAddress();
-                InetAddress inaddr = sockaddress.getAddress();
-                Inet4Address in4address = (Inet4Address)inaddr;
-                byte[] ip4bytes = in4address.getAddress(); // returns byte[4]
-                String ip4string = in4address.toString();
+
                 Socket finalS = s;
-                System.out.println("Client Connected: " + s.getRemoteSocketAddress());
+                System.out.println("Client Connected: " + sendingUser + " - Address: " + s.getRemoteSocketAddress());
 
                 Thread thread1 = new Thread(() -> {
-                    count.getAndIncrement();
-                    System.out.println("New Thread \"thread1\"" + count);
+                    //count.getAndIncrement();
+                    //System.out.println("New Thread \"thread1\"" + count);
                     while (finalS.isConnected()) {
-
 
                         BufferedReader br = null;
                         try {
+                            br = new BufferedReader((new InputStreamReader(finalS.getInputStream())));
+                            bw = new BufferedWriter(new OutputStreamWriter(finalS.getOutputStream()));
 
-
-                            br = new BufferedReader(new InputStreamReader(finalS.getInputStream()));
-                            bw = new BufferedWriter(new OutputStreamWriter(s.getOutputStream()));
                             String line;
                             int i = 0;
-                            while ((i != 2)) {
+                            while ((i != 3)) {
                                 line = br.readLine();
                                 if (i == 0) {
                                     address = line;
-                                }
-                                else {
+                                } else if (i == 1) {
+                                    sendingUser = line;
+                                } else if (i == 2) {
                                     finalMessage = line;
                                 }
                                 i++;
                             }
 
-                            System.out.println("Sending: " + finalMessage + " - To: " + address);
-                            writeMessage(finalS, address);
-//                            System.out.println("Message is: " + finalMessage);
-//                            System.out.println(this.finalMessage);
+                            System.out.println("Sending: " + finalMessage + " - From: " + sendingUser + " - To: " + address);
+                            writeMessage(finalS, address, sendingUser);
                             address = "";
                             finalMessage = "";
+                            sendingUser = "";
 
                         } catch (IOException e) {
-                            removeClient(finalS);
+                            removeClient(sendingUser);
+//                            removeClient(finalS);
                             try {
                                 finalS.close();
                             } catch (IOException ex) {
                                 ex.printStackTrace();
                             }
-                            //e.printStackTrace();
-                            //try {
-                            //    br.close();
-                            //    finalS.close();
-                            //} catch (IOException ex) {
-                            //    ex.printStackTrace();
-                            //}
                         }
                     }
                 });
@@ -98,32 +92,32 @@ public class Server {
         thread.start();
     }
 
-    public void writeMessage(Socket s, String address) throws IOException {
-        System.out.println("Address: " + address);
-        System.out.println("Address: " + s.getRemoteSocketAddress());
+    public void writeMessage(Socket s, String address, String sendingUser) throws IOException {
+        System.out.println("Sending to Address: " + address);
+        System.out.println("Client Address: " + s.getRemoteSocketAddress());
+
+        //Slicing out port from user code and sending to desired client
+        if (!listOfUsers.containsKey(address)) {
+            System.out.println("Could not find user");
+            return;
+        }
 
         try {
 
-            //Send to each client
-
-            for (int i = 0; i < listOfClients.size(); i++) {
-
-//                System.out.println(listOfClients.get(i).getRemoteSocketAddress());
-                if (Objects.equals(listOfClients.get(i).getRemoteSocketAddress().toString(), address)) {
-                    bw = new BufferedWriter(new OutputStreamWriter(listOfClients.get(i).getOutputStream()));
-                    bw.write(finalMessage);
-                    bw.newLine();
-                    bw.flush();
-                }
-            }
+            BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(listOfUsers.get(address).getOutputStream()));
+            StringBuilder rawUsernameBuilder = new StringBuilder(sendingUser);
+            String rawUsername = rawUsernameBuilder.substring(0, sendingUser.length() - 6);
+            bw.write(rawUsername + ": " + finalMessage);
+            bw.newLine();
+            bw.flush();
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
 
-    public void removeClient(Socket s) {
-        listOfClients.remove(s);
+    public void removeClient(String sendingUser) {
+        listOfUsers.remove(sendingUser);
     }
 
 }
